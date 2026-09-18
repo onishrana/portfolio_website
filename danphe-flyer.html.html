@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Danphe Flyer — Nepal Sky</title>
+<style>
+  :root{
+    --ink:#1c2333;
+    --paper:#fdf6ec;
+    --accent:#d9362b;
+    --accent2:#f2b705;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--ink);
+    font-family:'Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;}
+  #stage{position:relative;width:100%;max-width:480px;height:100vh;max-height:800px;overflow:hidden;
+    box-shadow:0 0 60px rgba(0,0,0,0.6);}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:absolute;top:16px;left:0;right:0;text-align:center;pointer-events:none;z-index:5;}
+  .score{font-family:Georgia,serif;font-weight:700;font-size:42px;color:var(--paper);
+    text-shadow:0 2px 6px rgba(0,0,0,0.35);}
+  .level{font-size:12px;color:var(--paper);opacity:0.9;letter-spacing:2px;text-transform:uppercase;margin-top:-4px;}
+
+  .panel{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(18,22,38,0.62);backdrop-filter:blur(3px);color:var(--paper);text-align:center;z-index:10;padding:20px;}
+  .hidden{display:none;}
+  .panel h1{font-family:Georgia,serif;font-size:30px;margin:0 0 4px;letter-spacing:0.5px;}
+  .panel .sub{font-size:13px;opacity:0.85;margin-bottom:16px;max-width:280px;line-height:1.5;}
+  .badge{width:60px;height:60px;margin-bottom:10px;}
+
+  .menu-list{display:flex;flex-direction:column;gap:10px;width:220px;}
+  .btn{background:var(--accent);color:var(--paper);border:none;padding:13px 22px;font-size:15px;font-weight:700;
+    border-radius:999px;cursor:pointer;letter-spacing:0.4px;box-shadow:0 5px 0 #a02921,0 8px 12px rgba(0,0,0,0.28);
+    transition:transform .06s ease;}
+  .btn:active{transform:translateY(4px);box-shadow:0 1px 0 #a02921;}
+  .btn.secondary{background:#3a4566;box-shadow:0 5px 0 #232a41,0 8px 12px rgba(0,0,0,0.28);}
+  .btn.secondary:active{box-shadow:0 1px 0 #232a41;}
+  .hi-score{font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:0.85;margin-bottom:14px;}
+
+  .picker{width:100%;max-width:340px;}
+  .picker-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:16px;}
+  .arrow{background:rgba(255,255,255,0.14);border:none;color:var(--paper);width:44px;height:44px;border-radius:50%;
+    font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .arrow:active{background:rgba(255,255,255,0.28);}
+  .preview-box{width:150px;height:150px;border-radius:20px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.15);}
+  .option-name{font-weight:700;font-size:16px;margin-bottom:2px;}
+  .option-index{font-size:11px;opacity:0.7;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;}
+
+  .footer-note{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:10px;
+    color:rgba(255,255,255,0.5);z-index:4;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="score" id="scoreLive">0</div>
+    <div class="level" id="levelLive">LEVEL 1</div>
+  </div>
+
+  <!-- Main Menu -->
+  <div class="panel" id="mainMenu">
+    <svg class="badge" viewBox="0 0 100 100" id="menuBirdIcon"></svg>
+    <h1>Danphe Flyer</h1>
+    <div class="sub">Guide Nepal's national bird across the sky. Tap or press Space to rise.</div>
+    <div class="hi-score" id="hiScoreText">HIGH SCORE 0</div>
+    <div class="menu-list">
+      <button class="btn" id="startBtn">Start</button>
+      <button class="btn secondary" id="bgBtn">Change Background</button>
+      <button class="btn secondary" id="birdBtn">Change Bird</button>
+    </div>
+  </div>
+
+  <!-- Background Picker -->
+  <div class="panel hidden" id="bgPanel">
+    <h1>Choose Sky</h1>
+    <div class="picker">
+      <div class="picker-row">
+        <button class="arrow" id="bgPrev">‹</button>
+        <div class="preview-box"><svg id="bgPreviewSvg" viewBox="0 0 150 150" width="150" height="150"></svg></div>
+        <button class="arrow" id="bgNext">›</button>
+      </div>
+      <div class="option-name" id="bgName"></div>
+      <div class="option-index" id="bgIndex"></div>
+    </div>
+    <button class="btn" id="bgDone">Use This Sky</button>
+  </div>
+
+  <!-- Bird Picker -->
+  <div class="panel hidden" id="birdPanel">
+    <h1>Choose Danphe</h1>
+    <div class="picker">
+      <div class="picker-row">
+        <button class="arrow" id="birdPrev">‹</button>
+        <div class="preview-box"><svg id="birdPreviewSvg" viewBox="0 0 150 150" width="150" height="150"></svg></div>
+        <button class="arrow" id="birdNext">›</button>
+      </div>
+      <div class="option-name" id="birdName"></div>
+      <div class="option-index" id="birdIndex"></div>
+    </div>
+    <button class="btn" id="birdDone">Use This Danphe</button>
+  </div>
+
+  <!-- Game Over -->
+  <div class="panel hidden" id="overPanel">
+    <h1>Kite Cut!</h1>
+    <div class="sub" id="overText">Score 0</div>
+    <div class="menu-list">
+      <button class="btn" id="retryBtn">Fly Again</button>
+      <button class="btn secondary" id="menuBtn">Main Menu</button>
+    </div>
+  </div>
+
+  <div class="footer-note">A tribute to Nepal's landscapes and national bird, the Danphe</div>
+</div>
+
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  let W,H,DPR;
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1,2);
+    W = stage.clientWidth; H = stage.clientHeight;
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---------- DATA: Backgrounds inspired by Nepali culture & landscapes ---------- */
+  const BACKGROUNDS = [
+    { name:"Manang Valley", sky:['#3a5478','#8fa8c4','#e8ecd8'], far:'rgba(150,155,140,0.5)', near:'rgba(120,110,90,0.75)', motif:'manang' },
+    { name:"Upper Mustang", sky:['#4a5a7a','#c98a5e','#f2d9a8'], far:'rgba(180,120,80,0.45)', near:'rgba(150,80,50,0.75)', motif:'mustang' },
+    { name:"Badimalika Temple", sky:['#345070','#7fa0b8','#e4eee0'], far:'rgba(110,140,110,0.5)', near:'rgba(60,95,65,0.75)', motif:'badimalika' },
+    { name:"Kori Waterfall", sky:['#20463d','#4d8a72','#d9edd0'], far:'rgba(90,140,120,0.5)', near:'rgba(45,90,75,0.75)', motif:'kori' },
+    { name:"Himalayan Dawn", sky:['#1e3a63','#5f8fc4','#dcebf5'], far:'rgba(140,160,195,0.55)', near:'rgba(80,100,145,0.7)', motif:'himalaya' },
+    { name:"Everest Sunset", sky:['#7a2e3a','#d97a4f','#f5cf8a'], far:'rgba(150,90,100,0.5)', near:'rgba(100,55,65,0.7)', motif:'himalaya' },
+    { name:"Kathmandu Durbar Square", sky:['#40506e','#7a8cae','#e7ecf5'], far:'rgba(120,110,140,0.5)', near:'rgba(70,58,80,0.75)', motif:'durbar' },
+    { name:"Boudhanath Stupa", sky:['#2c5470','#6fa3b8','#e8f2ee'], far:'rgba(120,150,160,0.5)', near:'rgba(60,95,110,0.75)', motif:'stupa' },
+    { name:"Pokhara Phewa Lake", sky:['#234a63','#6ba0b8','#cfeae0'], far:'rgba(100,150,170,0.5)', near:'rgba(50,95,110,0.7)', motif:'lake' },
+    { name:"Dashain Kite Season", sky:['#3a6bb0','#7bb0e8','#e8f4ff'], far:'rgba(130,165,210,0.5)', near:'rgba(70,110,170,0.65)', motif:'dashain' },
+    { name:"Tihar Night Lights", sky:['#161033','#3a2560','#7a4a8c'], far:'rgba(90,60,120,0.55)', near:'rgba(50,30,80,0.75)', motif:'tihar' },
+    { name:"Annapurna Terraces", sky:['#2f5b4a','#6f9c6a','#e3edc8'], far:'rgba(120,150,100,0.5)', near:'rgba(70,105,60,0.7)', motif:'terrace' },
+    { name:"Chitwan Jungle Mist", sky:['#22432e','#4f7a4a','#c9dbb0'], far:'rgba(90,120,80,0.55)', near:'rgba(45,75,45,0.75)', motif:'jungle' },
+    { name:"Lumbini Sunrise", sky:['#5a3b6b','#c47a8e','#ffd9a0'], far:'rgba(170,130,150,0.5)', near:'rgba(110,70,95,0.7)', motif:'lumbini' },
+    { name:"Rara Blue Hour", sky:['#0f2c4c','#264f7a','#8fb3c9'], far:'rgba(90,120,150,0.55)', near:'rgba(40,65,95,0.75)', motif:'himalaya' },
+    { name:"Bhaktapur Rooftops", sky:['#5a3a2e','#a86a45','#f0c98a'], far:'rgba(150,110,80,0.5)', near:'rgba(95,60,45,0.75)', motif:'durbar' },
+    { name:"Dhorpatan Hunting Reserve", sky:['#203c48','#668f83','#dce4c2'], far:'rgba(110,145,125,0.55)', near:'rgba(45,80,65,0.78)', motif:'dhorpatan' },
+    { name:"Tilicho Lake", sky:['#173d63','#4b91b5','#d7eee8'], far:'rgba(115,160,180,0.55)', near:'rgba(45,85,115,0.78)', motif:'tilicho' },
+    { name:"Langtang Valley", sky:['#294b62','#78a6b5','#e7efd9'], far:'rgba(125,155,155,0.5)', near:'rgba(60,95,80,0.75)', motif:'himalaya' },
+    { name:"Gosaikunda Lake", sky:['#17324c','#4c7f9c','#c9e0dc'], far:'rgba(100,145,165,0.55)', near:'rgba(45,75,95,0.78)', motif:'tilicho' },
+    { name:"Ilam Tea Gardens", sky:['#285044','#70a66c','#dcecc1'], far:'rgba(110,155,100,0.5)', near:'rgba(45,95,55,0.78)', motif:'terrace' }
+  ];
+
+  /* ---------- DATA: Danphe (Himalayan Monal) color skins ---------- */
+  const BIRDS = [
+    { name:"Classic Danphe", crest:'#0f6e5c', body:'#2f8f7a', wing:'#d9362b', tail:'#1c2333', accent:'#f2b705' },
+    { name:"Royal Danphe", crest:'#2a3d8f', body:'#3e56b8', wing:'#c9a227', tail:'#1c2333', accent:'#e7c96a' },
+    { name:"Ruby Danphe", crest:'#7a1030', body:'#b3163f', wing:'#f2b705', tail:'#2a0a14', accent:'#ffdca0' },
+    { name:"Emerald Danphe", crest:'#0b5c3a', body:'#189462', wing:'#f2b705', tail:'#0a2a1c', accent:'#bff2d8' },
+    { name:"Sapphire Danphe", crest:'#123d6b', body:'#1c5ea8', wing:'#f2b705', tail:'#0a1c33', accent:'#bfe0ff' },
+    { name:"Golden Danphe", crest:'#a8790f', body:'#e0a72c', wing:'#7a3b1e', tail:'#3a2408', accent:'#fff2c9' },
+    { name:"Sunset Danphe", crest:'#b3401f', body:'#e0692f', wing:'#f2b705', tail:'#5c1a0a', accent:'#ffd9a0' },
+    { name:"Silver Danphe", crest:'#5a6270', body:'#8b95a3', wing:'#d9362b', tail:'#2a2e38', accent:'#eef1f5' },
+    { name:"Monsoon Danphe", crest:'#1c3d3d', body:'#2f5f5f', wing:'#c9a227', tail:'#0f2323', accent:'#a8d0d0' },
+    { name:"Rainbow Danphe", crest:'#8f2a8f', body:'#2f8f7a', wing:'#d9362b', tail:'#1c2333', accent:'#f2b705', rainbow:true },
+    { name:"Rhododendron Danphe", crest:'#7a1030', body:'#c4306a', wing:'#f2b705', tail:'#3a0a1c', accent:'#ffb3c9' },
+    { name:"Snow Danphe", crest:'#4a5568', body:'#e8ecf0', wing:'#3a4a6b', tail:'#2a2e38', accent:'#ffffff' },
+    { name:"Himalayan Eagle", type:'eagle', crest:'#4b3025', body:'#8b5e3c', wing:'#3b271f', tail:'#241914', accent:'#d4a85e' },
+    { name:"House Sparrow", type:'sparrow', crest:'#8a6042', body:'#a87852', wing:'#5a4032', tail:'#4b3428', accent:'#e3b36b' },
+    { name:"Himalayan Parrot", type:'parrot', crest:'#16834c', body:'#31b66a', wing:'#e6c229', tail:'#12633f', accent:'#ef7d24' },
+    { name:"Mountain Hawk", type:'eagle', crest:'#303b48', body:'#687887', wing:'#26313b', tail:'#18212a', accent:'#d9b56d' }
+  ];
+
+  let bgIndex = 0, birdIndex = 0, best = 0;
+
+  /* ---------- SVG preview helpers ---------- */
+  function bgPreviewSVG(bg){
+    const [t,m,b] = bg.sky;
+    return `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${t}"/><stop offset="0.55" stop-color="${m}"/><stop offset="1" stop-color="${b}"/>
+      </linearGradient></defs>
+      <rect width="150" height="150" fill="url(#g)"/>
+      <polygon points="0,150 20,90 45,120 70,70 95,115 120,85 150,130 150,150" fill="${bg.near}"/>
+      <polygon points="0,150 30,110 60,135 90,95 130,125 150,140 150,150" fill="${bg.far}"/>`;
+  }
+  function birdPreviewSVG(b){
+    if(b.type==='eagle') return `<circle cx="75" cy="75" r="70" fill="rgba(255,255,255,0.05)"/>
+      <path d="M28 78 Q52 48 75 70 Q98 48 122 78 Q102 72 90 88 L75 108 L60 88 Q48 72 28 78Z" fill="${b.wing}"/>
+      <ellipse cx="75" cy="78" rx="15" ry="28" fill="${b.body}"/><circle cx="75" cy="49" r="13" fill="${b.crest}"/>
+      <path d="M87 48 L106 54 L87 59Z" fill="${b.accent}"/><circle cx="80" cy="46" r="2.4" fill="#111"/>`;
+    if(b.type==='parrot') return `<circle cx="75" cy="75" r="70" fill="rgba(255,255,255,0.05)"/>
+      <path d="M70 88 Q38 112 42 130 Q65 117 79 94Z" fill="${b.tail}"/><ellipse cx="76" cy="82" rx="26" ry="34" fill="${b.body}"/>
+      <circle cx="76" cy="48" r="18" fill="${b.crest}"/><path d="M89 49 Q112 55 91 66 L84 57Z" fill="${b.accent}"/>
+      <path d="M58 78 Q35 75 45 100 Q60 95 68 86Z" fill="${b.wing}"/><circle cx="82" cy="45" r="2.5" fill="#111"/>`;
+    if(b.type==='sparrow') return `<circle cx="75" cy="75" r="70" fill="rgba(255,255,255,0.05)"/>
+      <path d="M66 88 L35 112 L55 78Z" fill="${b.tail}"/><ellipse cx="78" cy="82" rx="30" ry="22" fill="${b.body}"/>
+      <path d="M65 78 Q43 70 40 92 Q55 90 70 86Z" fill="${b.wing}"/><circle cx="99" cy="70" r="15" fill="${b.crest}"/>
+      <path d="M110 69 L126 75 L110 80Z" fill="${b.accent}"/><circle cx="104" cy="67" r="2.4" fill="#111"/>`;
+    return `<circle cx="75" cy="75" r="70" fill="rgba(255,255,255,0.05)"/>
+      <ellipse cx="75" cy="90" rx="30" ry="22" fill="${b.body}"/>
+      <path d="M75 90 Q120 100 135 130 Q100 120 75 105 Z" fill="${b.tail}"/>
+      <circle cx="60" cy="62" r="16" fill="${b.crest}"/>
+      <path d="M60 46 Q64 20 70 44 Q66 30 60 46 Z" fill="${b.accent}"/>
+      <path d="M55 62 Q30 55 30 75 Q45 72 58 68 Z" fill="${b.wing}"/>
+      <circle cx="66" cy="60" r="2.4" fill="#111"/>
+      <path d="M50 62 L40 65 L50 68 Z" fill="${b.accent}"/>`;
+  }
+
+  function refreshBgPreview(){
+    const bg = BACKGROUNDS[bgIndex];
+    document.getElementById('bgPreviewSvg').innerHTML = bgPreviewSVG(bg);
+    document.getElementById('bgName').textContent = bg.name;
+    document.getElementById('bgIndex').textContent = (bgIndex+1)+' / '+BACKGROUNDS.length;
+  }
+  function refreshBirdPreview(){
+    const b = BIRDS[birdIndex];
+    document.getElementById('birdPreviewSvg').innerHTML = birdPreviewSVG(b);
+    document.getElementById('birdName').textContent = b.name;
+    document.getElementById('birdIndex').textContent = (birdIndex+1)+' / '+BIRDS.length;
+    document.getElementById('menuBirdIcon').innerHTML = birdPreviewSVG(b);
+  }
+
+  /* ---------- Panels & menu wiring ---------- */
+  const mainMenu=document.getElementById('mainMenu'), bgPanel=document.getElementById('bgPanel'),
+    birdPanel=document.getElementById('birdPanel'), overPanel=document.getElementById('overPanel');
+  const scoreLive=document.getElementById('scoreLive'), levelLive=document.getElementById('levelLive');
+  const hiScoreText=document.getElementById('hiScoreText'), overText=document.getElementById('overText');
+
+  function showOnly(panel){
+    [mainMenu,bgPanel,birdPanel,overPanel].forEach(p=>p.classList.add('hidden'));
+    if(panel) panel.classList.remove('hidden');
+  }
+
+  document.getElementById('bgBtn').onclick=()=>{ refreshBgPreview(); showOnly(bgPanel); };
+  document.getElementById('birdBtn').onclick=()=>{ refreshBirdPreview(); showOnly(birdPanel); };
+  document.getElementById('bgPrev').onclick=()=>{ bgIndex=(bgIndex-1+BACKGROUNDS.length)%BACKGROUNDS.length; refreshBgPreview(); };
+  document.getElementById('bgNext').onclick=()=>{ bgIndex=(bgIndex+1)%BACKGROUNDS.length; refreshBgPreview(); };
+  document.getElementById('birdPrev').onclick=()=>{ birdIndex=(birdIndex-1+BIRDS.length)%BIRDS.length; refreshBirdPreview(); };
+  document.getElementById('birdNext').onclick=()=>{ birdIndex=(birdIndex+1)%BIRDS.length; refreshBirdPreview(); };
+  document.getElementById('bgDone').onclick=()=>{ showOnly(mainMenu); };
+  document.getElementById('birdDone').onclick=()=>{ refreshBirdPreview(); showOnly(mainMenu); };
+  document.getElementById('menuBtn').onclick=()=>{ showOnly(mainMenu); };
+  document.getElementById('startBtn').onclick=startGame;
+  document.getElementById('retryBtn').onclick=startGame;
+
+  refreshBgPreview(); refreshBirdPreview();
+  hiScoreText.textContent = 'HIGH SCORE '+best;
+
+  /* ---------- Game constants ---------- */
+  const GRAVITY=1500, FLAP=-420, GAP_MIN=170, GAP_START=235;
+  let bird, obstacles, particles, score, level, gameState, spawnTimer, elapsed, gapSize, speed, tail;
+  let audioContext;
+
+  function playTone(frequency, duration, type='sine', volume=0.08){
+    audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+    if(audioContext.state==='suspended') audioContext.resume();
+    const oscillator=audioContext.createOscillator();
+    const gain=audioContext.createGain();
+    oscillator.type=type; oscillator.frequency.value=frequency;
+    gain.gain.setValueAtTime(volume,audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,audioContext.currentTime+duration);
+    oscillator.connect(gain); gain.connect(audioContext.destination);
+    oscillator.start(); oscillator.stop(audioContext.currentTime+duration);
+  }
+
+  function playPointSound(){
+    playTone(660,0.09,'triangle',0.07);
+    setTimeout(()=>playTone(880,0.12,'triangle',0.06),55);
+  }
+
+  function playFailSound(){
+    playTone(220,0.35,'sawtooth',0.09);
+    setTimeout(()=>playTone(120,0.45,'sawtooth',0.07),120);
+  }
+
+  function resetGame(){
+    bird={x:W*0.28,y:H*0.4,vy:0,r:16,rot:0};
+    tail=[]; for(let i=0;i<10;i++) tail.push({x:bird.x,y:bird.y});
+    obstacles=[]; particles=[];
+    score=0; level=1; elapsed=0; spawnTimer=0;
+    gapSize=GAP_START; speed=185;
+    scoreLive.textContent='0'; levelLive.textContent='LEVEL 1';
+    gameState='playing';
+  }
+
+  function startGame(){
+    resetGame();
+    showOnly(null);
+  }
+
+  function flap(){
+    if(gameState!=='playing') return;
+    bird.vy=FLAP;
+    for(let i=0;i<4;i++) particles.push({x:bird.x-10,y:bird.y+8,vx:-60-Math.random()*40,vy:(Math.random()-0.5)*60,life:0.5,r:2+Math.random()*2,color:BIRDS[birdIndex].accent});
+  }
+
+  function endGame(){
+    gameState='over';
+    playFailSound();
+    if(score>best){ best=score; hiScoreText.textContent='HIGH SCORE '+best; }
+    overText.textContent='Score '+score+'  •  Level '+level+(score>=best && score>0 ? '  •  New best!':'');
+    for(let i=0;i<26;i++) particles.push({x:bird.x,y:bird.y,vx:(Math.random()-0.5)*260,vy:(Math.random()-0.5)*260,life:0.8,r:2+Math.random()*3,color: Math.random()<0.5?BIRDS[birdIndex].wing:BIRDS[birdIndex].accent});
+    setTimeout(()=>showOnly(overPanel), 550);
+  }
+
+  function spawnObstacle(){
+    const margin=60;
+    const gapY=margin+Math.random()*(H-margin*2-gapSize);
+    const kind = Math.random()<0.5 ? 'peak' : 'pillar';
+    obstacles.push({x:W+40,gapY,gapSize,passed:false,kind,wobble:Math.random()*Math.PI*2});
+  }
+
+  /* ---------- Drawing: background motifs ---------- */
+  function drawSky(bg){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,bg.sky[0]); g.addColorStop(0.55,bg.sky[1]); g.addColorStop(1,bg.sky[2]);
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+
+  function drawRidge(offsetX, color, heightScale, baseY){
+    ctx.fillStyle=color;
+    ctx.beginPath(); ctx.moveTo(0,H);
+    const step=70;
+    for(let x=-step;x<=W+step;x+=step){
+      const seed=Math.sin((x+offsetX)*0.015)*0.5+Math.sin((x+offsetX)*0.004)*0.5;
+      ctx.lineTo(x, baseY-(seed*0.5+0.5)*heightScale);
+    }
+    ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+  }
+
+  function drawMotifDecor(bg, farOff, nearOff){
+    ctx.save();
+    if(bg.motif==='manang'){
+      // arid high valley: jagged snow peaks, scattered chortens, poplar trees
+      ctx.fillStyle='rgba(255,255,255,0.55)';
+      for(let i=0;i<3;i++){
+        const px = ((i*160 + farOff*0.2) % (W+120)) - 60;
+        ctx.beginPath();
+        ctx.moveTo(px,H*0.42); ctx.lineTo(px+14,H*0.32); ctx.lineTo(px+28,H*0.42); ctx.closePath(); ctx.fill();
+      }
+      for(let x=-40+((nearOff*0.4)%150);x<W+150;x+=150){
+        ctx.fillStyle='rgba(230,220,200,0.85)';
+        ctx.beginPath(); ctx.arc(x,H*0.78,10,Math.PI,0); ctx.fill();
+        ctx.fillRect(x-2,H*0.78,4,10);
+        ctx.fillStyle='rgba(180,50,40,0.7)';
+        ctx.beginPath(); ctx.moveTo(x-5,H*0.78-10); ctx.lineTo(x,H*0.78-18); ctx.lineTo(x+5,H*0.78-10); ctx.closePath(); ctx.fill();
+      }
+    } else if(bg.motif==='mustang'){
+      // ochre eroded cliffs with cave holes and prayer flag lines
+      ctx.fillStyle='rgba(160,80,45,0.5)';
+      for(let x=-30+((nearOff*0.45)%130);x<W+130;x+=130){
+        ctx.beginPath();
+        ctx.moveTo(x-24,H*0.85); ctx.lineTo(x-14,H*0.55); ctx.lineTo(x+6,H*0.6); ctx.lineTo(x+20,H*0.5); ctx.lineTo(x+30,H*0.85);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle='rgba(60,25,15,0.55)';
+        ctx.beginPath(); ctx.ellipse(x-6,H*0.68,4,6,0,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x+8,H*0.72,3,5,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='rgba(160,80,45,0.5)';
+      }
+      ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(0,H*0.3); ctx.lineTo(W,H*0.26); ctx.stroke();
+    } else if(bg.motif==='badimalika'){
+      // pagoda-roofed hill temple with stone stairway
+      const x=W*0.68;
+      ctx.fillStyle='rgba(90,110,80,0.6)';
+      ctx.beginPath(); ctx.moveTo(x-60,H*0.85); ctx.quadraticCurveTo(x,H*0.55,x+60,H*0.85); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(70,50,35,0.85)';
+      ctx.fillRect(x-10,H*0.62,20,18);
+      ctx.fillStyle='rgba(180,40,30,0.85)';
+      ctx.beginPath(); ctx.moveTo(x-18,H*0.62); ctx.lineTo(x,H*0.5); ctx.lineTo(x+18,H*0.62); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x-13,H*0.52); ctx.lineTo(x,H*0.44); ctx.lineTo(x+13,H*0.52); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(200,200,190,0.5)'; ctx.lineWidth=3;
+      ctx.beginPath();
+      for(let i=0;i<8;i++){ ctx.lineTo(x-70+i*9, H*0.85-i*3); }
+      ctx.stroke();
+    } else if(bg.motif==='kori'){
+      // tall cascading waterfall through green gorge
+      const x=W*0.55 + Math.sin(elapsed*0.3)*2;
+      ctx.fillStyle='rgba(40,80,60,0.6)';
+      ctx.fillRect(0,0,x-26,H);
+      ctx.fillRect(x+26,0,W-(x+26),H);
+      const wf=ctx.createLinearGradient(0,H*0.1,0,H*0.9);
+      wf.addColorStop(0,'rgba(255,255,255,0.9)'); wf.addColorStop(1,'rgba(220,240,235,0.6)');
+      ctx.fillStyle=wf;
+      ctx.beginPath();
+      ctx.moveTo(x-14,H*0.08); ctx.lineTo(x+14,H*0.08);
+      ctx.lineTo(x+22,H*0.9); ctx.lineTo(x-22,H*0.9); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.ellipse(x,H*0.92,40,12,0,0,Math.PI*2); ctx.fill();
+    } else if(bg.motif==='durbar'){
+      for(let x=-60+((nearOff*0.4)%140);x<W+140;x+=140){
+        ctx.fillStyle='rgba(40,30,25,0.55)';
+        ctx.fillRect(x,H*0.72,26,H*0.28);
+        ctx.beginPath(); ctx.moveTo(x-10,H*0.72); ctx.lineTo(x+13,H*0.62); ctx.lineTo(x+36,H*0.72); ctx.closePath(); ctx.fill();
+      }
+    } else if(bg.motif==='stupa'){
+      const x = W*0.7 + Math.sin(elapsed*0.05)*4;
+      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.beginPath(); ctx.arc(x,H*0.62,46,Math.PI,0); ctx.fill();
+      ctx.fillRect(x-8,H*0.42,16,20);
+      ctx.fillStyle='rgba(210,60,40,0.6)';
+      ctx.beginPath(); ctx.moveTo(x-16,H*0.42); ctx.lineTo(x,H*0.32); ctx.lineTo(x+16,H*0.42); ctx.closePath(); ctx.fill();
+    } else if(bg.motif==='dhorpatan'){
+      ctx.fillStyle='rgba(35,70,55,0.5)';
+      for(let x=-30+((nearOff*0.45)%110);x<W+110;x+=110){
+        ctx.beginPath(); ctx.moveTo(x,H*0.84); ctx.lineTo(x+25,H*0.58); ctx.lineTo(x+50,H*0.84); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle='rgba(225,235,200,0.55)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(x+25,H*0.58); ctx.lineTo(x+25,H*0.84); ctx.stroke();
+      }
+    } else if(bg.motif==='tilicho'){
+      ctx.fillStyle='rgba(180,215,220,0.6)';
+      ctx.beginPath(); ctx.ellipse(W*0.5,H*0.78,W*0.48,H*0.13,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.32)'; ctx.lineWidth=2;
+      for(let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(W*0.12,H*(0.73+i*0.035)); ctx.lineTo(W*0.88,H*(0.73+i*0.035)); ctx.stroke(); }
+    } else if(bg.motif==='dashain' || bg.motif==='tihar'){
+      for(let i=0;i<5;i++){
+        const kx=((i*97 + nearOff*0.3) % (W+80)) - 40;
+        const ky=H*0.15 + i*28 % (H*0.3);
+        ctx.fillStyle = bg.motif==='tihar' ? 'rgba(255,210,120,0.85)' : 'rgba(255,255,255,0.5)';
+        ctx.beginPath();
+        ctx.moveTo(kx,ky-10); ctx.lineTo(kx+8,ky); ctx.lineTo(kx,ky+10); ctx.lineTo(kx-8,ky); ctx.closePath(); ctx.fill();
+      }
+    } else if(bg.motif==='terrace'){
+      ctx.fillStyle='rgba(255,255,255,0.12)';
+      for(let i=0;i<6;i++){
+        ctx.fillRect(0, H*0.62+i*10, W, 2);
+      }
+    } else if(bg.motif==='lake'){
+      ctx.fillStyle='rgba(255,255,255,0.15)';
+      ctx.fillRect(0,H*0.86,W,H*0.14);
+    } else if(bg.motif==='jungle'){
+      ctx.fillStyle='rgba(20,40,20,0.5)';
+      for(let x=-30+((nearOff*0.5)%90);x<W+90;x+=90){
+        ctx.beginPath(); ctx.ellipse(x,H*0.78,20,34,0,0,Math.PI*2); ctx.fill();
+      }
+    } else if(bg.motif==='lumbini'){
+      ctx.fillStyle='rgba(255,255,255,0.4)';
+      ctx.beginPath(); ctx.arc(W*0.5,H*0.7,10,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBird(x,y,rot,scale=1){
+    const b=BIRDS[birdIndex];
+    ctx.save();
+    ctx.translate(x,y); ctx.rotate(rot); ctx.scale(scale,scale);
+    if(b.type==='eagle'){
+      ctx.fillStyle=b.wing;
+      ctx.beginPath(); ctx.moveTo(0,4); ctx.quadraticCurveTo(-28,-14,-42,-2); ctx.lineTo(-22,10); ctx.quadraticCurveTo(-10,8,0,12); ctx.quadraticCurveTo(10,8,22,10); ctx.lineTo(42,-2); ctx.quadraticCurveTo(28,-14,0,4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=b.body; ctx.beginPath(); ctx.ellipse(0,5,11,15,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.crest; ctx.beginPath(); ctx.arc(10,-7,7,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.accent; ctx.beginPath(); ctx.moveTo(16,-6); ctx.lineTo(25,-3); ctx.lineTo(16,0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(12,-8,1.4,0,Math.PI*2); ctx.fill();
+      ctx.restore(); return;
+    }
+    if(b.type==='parrot'){
+      ctx.fillStyle=b.tail; ctx.beginPath(); ctx.moveTo(-2,10); ctx.lineTo(-27,28); ctx.lineTo(-15,2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=b.body; ctx.beginPath(); ctx.ellipse(0,5,14,18,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.wing; ctx.beginPath(); ctx.ellipse(-8,7,8,13,-0.3,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.crest; ctx.beginPath(); ctx.arc(9,-10,9,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.accent; ctx.beginPath(); ctx.moveTo(16,-8); ctx.quadraticCurveTo(28,-2,17,3); ctx.lineTo(14,-3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(12,-12,1.5,0,Math.PI*2); ctx.fill();
+      ctx.restore(); return;
+    }
+    if(b.type==='sparrow'){
+      ctx.fillStyle=b.tail; ctx.beginPath(); ctx.moveTo(-3,8); ctx.lineTo(-34,25); ctx.lineTo(-19,0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=b.body; ctx.beginPath(); ctx.ellipse(0,5,17,12,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.wing; ctx.beginPath(); ctx.ellipse(-7,5,11,7,-0.25,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.crest; ctx.beginPath(); ctx.arc(12,-5,8,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=b.accent; ctx.beginPath(); ctx.moveTo(19,-4); ctx.lineTo(28,-1); ctx.lineTo(19,2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(14,-7,1.4,0,Math.PI*2); ctx.fill();
+      ctx.restore(); return;
+    }
+    // tail feathers
+    ctx.fillStyle=b.tail;
+    ctx.beginPath();
+    ctx.moveTo(-2,4); ctx.quadraticCurveTo(-30,2,-42,20); ctx.quadraticCurveTo(-20,10,-2,10); ctx.closePath(); ctx.fill();
+    // body
+    ctx.fillStyle=b.body;
+    ctx.beginPath(); ctx.ellipse(0,4,15,11,0,0,Math.PI*2); ctx.fill();
+    // wing
+    ctx.fillStyle = b.rainbow ? '#d9362b' : b.wing;
+    ctx.beginPath(); ctx.ellipse(-4,4,9,6,0.3,0,Math.PI*2); ctx.fill();
+    // head + crest
+    ctx.fillStyle=b.crest;
+    ctx.beginPath(); ctx.arc(11,-5,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=b.accent;
+    ctx.beginPath(); ctx.moveTo(11,-11); ctx.quadraticCurveTo(14,-22,17,-10); ctx.quadraticCurveTo(13,-15,11,-11); ctx.closePath(); ctx.fill();
+    // beak
+    ctx.fillStyle='#e8b84b';
+    ctx.beginPath(); ctx.moveTo(17,-4); ctx.lineTo(23,-2); ctx.lineTo(17,0); ctx.closePath(); ctx.fill();
+    // eye
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(13,-6,1.4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawObstacle(o, bg){
+    const rockColor = bg.near.replace(/[\d.]+\)$/,'0.9)');
+    if(o.kind==='peak'){
+      ctx.fillStyle=rockColor;
+      ctx.beginPath(); ctx.moveTo(o.x-38,o.gapY); ctx.lineTo(o.x,o.gapY-140); ctx.lineTo(o.x+38,o.gapY); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.moveTo(o.x-10,o.gapY-108); ctx.lineTo(o.x,o.gapY-140); ctx.lineTo(o.x+10,o.gapY-108); ctx.lineTo(o.x,o.gapY-118); ctx.closePath(); ctx.fill();
+      const bY=o.gapY+o.gapSize;
+      ctx.fillStyle=rockColor;
+      ctx.beginPath(); ctx.moveTo(o.x-38,bY); ctx.lineTo(o.x,bY+140); ctx.lineTo(o.x+38,bY); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.moveTo(o.x-10,bY+108); ctx.lineTo(o.x,bY+140); ctx.lineTo(o.x+10,bY+108); ctx.lineTo(o.x,bY+118); ctx.closePath(); ctx.fill();
+    } else {
+      const pillarColor='rgba(90,60,40,0.85)';
+      ctx.fillStyle=pillarColor;
+      ctx.fillRect(o.x-16,0,32,o.gapY);
+      ctx.beginPath(); ctx.moveTo(o.x-26,o.gapY); ctx.lineTo(o.x,o.gapY-26); ctx.lineTo(o.x+26,o.gapY); ctx.closePath();
+      ctx.fillStyle='rgba(150,60,45,0.9)'; ctx.fill();
+      const bY=o.gapY+o.gapSize;
+      ctx.fillStyle=pillarColor;
+      ctx.fillRect(o.x-16,bY,32,H-bY);
+      ctx.beginPath(); ctx.moveTo(o.x-26,bY); ctx.lineTo(o.x,bY+26); ctx.lineTo(o.x+26,bY); ctx.closePath();
+      ctx.fillStyle='rgba(150,60,45,0.9)'; ctx.fill();
+    }
+  }
+
+  function hit(o,k){
+    const halfW=20;
+    if(k.x+k.r<o.x-halfW || k.x-k.r>o.x+halfW) return false;
+    const topEdge=o.gapY, botEdge=o.gapY+o.gapSize;
+    if(k.y-k.r<topEdge) return true;
+    if(k.y+k.r>botEdge) return true;
+    return false;
+  }
+
+  /* ---------- Main loop ---------- */
+  let lastTime=performance.now();
+  resetGame(); gameState='ready';
+
+  function loop(now){
+    const dt=Math.min((now-lastTime)/1000,0.033); lastTime=now;
+    const bg=BACKGROUNDS[bgIndex];
+    ctx.clearRect(0,0,W,H);
+    drawSky(bg);
+
+    ctx.fillStyle='rgba(255,245,210,0.85)';
+    ctx.beginPath(); ctx.arc(W*0.78,H*0.16,32,0,Math.PI*2); ctx.fill();
+
+    elapsed+=dt;
+    const farOff=-elapsed*18, nearOff=-elapsed*34;
+    drawRidge(farOff, bg.far, H*0.4, H*0.72);
+    drawRidge(nearOff, bg.near, H*0.28, H*0.82);
+    drawMotifDecor(bg, farOff, nearOff);
+
+    if(gameState==='playing'){
+      bird.vy+=GRAVITY*dt; bird.y+=bird.vy*dt;
+      bird.rot=Math.max(-0.5,Math.min(1.1,bird.vy/500));
+
+      spawnTimer+=dt;
+      const interval=Math.max(1.3, 2.0 - level*0.03);
+      if(spawnTimer>interval){ spawnTimer=0; spawnObstacle(); }
+
+      // slow difficulty ramp: tied to level, not raw time
+      gapSize=Math.max(GAP_MIN, GAP_START - level*4);
+      speed=185 + Math.min(140, level*7);
+
+      for(let i=obstacles.length-1;i>=0;i--){
+        const o=obstacles[i];
+        o.x-=speed*dt; o.wobble+=dt*2;
+        if(!o.passed && o.x<bird.x){
+          o.passed=true; score++; scoreLive.textContent=score;
+          playPointSound();
+          const newLevel=1+Math.floor(score/8);
+          if(newLevel!==level){ level=newLevel; levelLive.textContent='LEVEL '+level; }
+        }
+        if(hit(o,bird)) endGame();
+        if(o.x<-60) obstacles.splice(i,1);
+      }
+      if(bird.y-bird.r<0 || bird.y+bird.r>H) endGame();
+    }
+
+    obstacles.forEach(o=>drawObstacle(o,bg));
+
+    tail.push({x:bird.x-14,y:bird.y}); if(tail.length>12) tail.shift();
+    ctx.strokeStyle='rgba(253,246,236,0.55)'; ctx.lineWidth=2.5;
+    ctx.beginPath(); tail.forEach((p,i)=>{ if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }); ctx.stroke();
+
+    const idleBob = (gameState==='ready') ? Math.sin(elapsed*3)*0.15 : bird.rot;
+    drawBird(bird.x,bird.y, idleBob, 1.3);
+
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=300*dt; p.life-=dt;
+      if(p.life<=0){ particles.splice(i,1); continue; }
+      ctx.globalAlpha=Math.max(0,p.life/0.8);
+      ctx.fillStyle=p.color||'#fdf6ec';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  window.addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); flap(); } });
+  stage.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.btn') || e.target.closest('.arrow')) return;
+    flap();
+  });
+})();
+</script>
+</body>
+</html>
